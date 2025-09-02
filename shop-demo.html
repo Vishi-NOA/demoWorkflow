@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Data Scraper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Page 1: Form -->
+    <div id="formPage" class="container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-gray-800 mb-2">Product Data Scraper</h1>
+                <p class="text-gray-600">Extract and visualize product information from any website</p>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-lg p-8">
+                <form id="webhookForm" class="space-y-6">
+                    <div>
+                        <label for="webhookUrl" class="block text-sm font-semibold text-gray-700 mb-3">
+                            🔗 Webhook URL
+                        </label>
+                        <input 
+                            type="url" 
+                            id="webhookUrl" 
+                            name="webhookUrl"
+                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                            placeholder="https://your-n8n-instance.com/webhook/..."
+                            required
+                        >
+                    </div>
+                    
+                    <div>
+                        <label for="scrapeUrl" class="block text-sm font-semibold text-gray-700 mb-3">
+                            🌐 URL to Scrape
+                        </label>
+                        <input 
+                            type="url" 
+                            id="scrapeUrl" 
+                            name="scrapeUrl"
+                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                            placeholder="https://example.com/products"
+                            required
+                        >
+                    </div>
+                    
+                    <div>
+                        <label for="imageUpload" class="block text-sm font-semibold text-gray-700 mb-3">
+                            📸 Upload Image (Optional)
+                        </label>
+                        <div class="relative">
+                            <input 
+                                type="file" 
+                                id="imageUpload" 
+                                name="imageUpload"
+                                accept="image/*"
+                                class="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all cursor-pointer hover:bg-gray-50"
+                            >
+                            <div class="absolute top-3 right-4 text-gray-400 pointer-events-none">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div id="imagePreview" class="mt-3 hidden">
+                            <img id="previewImg" class="w-32 h-32 object-cover rounded-lg border-2 border-gray-200" />
+                        </div>
+                    </div>
+                    
+                    <button 
+                        type="submit"
+                        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-6 rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-4 focus:ring-blue-200 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                        id="fetchBtn"
+                    >
+                        🚀 Extract Product Data
+                    </button>
+                </form>
+                
+                <div id="loading" class="hidden text-center py-8">
+                    <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+                    <p class="text-lg text-gray-600 font-medium">Extracting product data...</p>
+                    <p class="text-sm text-gray-500 mt-2">This may take a few moments</p>
+                </div>
+                
+                <div id="error" class="hidden bg-red-50 border-2 border-red-200 text-red-700 px-6 py-4 rounded-xl mt-6">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span id="errorMessage" class="font-medium"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page 2: Results Display -->
+    <div id="resultsPage" class="hidden min-h-screen bg-gray-50"></div>
+
+    <script>
+        // Image upload preview
+        document.getElementById('imageUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('previewImg').src = e.target.result;
+                    document.getElementById('imagePreview').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                document.getElementById('imagePreview').classList.add('hidden');
+            }
+        });
+
+        // Form submission
+        document.getElementById('webhookForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const webhookUrl = document.getElementById('webhookUrl').value;
+            const scrapeUrl = document.getElementById('scrapeUrl').value;
+            const imageFile = document.getElementById('imageUpload').files[0];
+            const fetchBtn = document.getElementById('fetchBtn');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            
+            // Reset UI
+            error.classList.add('hidden');
+            loading.classList.remove('hidden');
+            fetchBtn.disabled = true;
+            
+            try {
+                // Construct the webhook URL with scrape URL parameter
+                const url = new URL(webhookUrl);
+                url.searchParams.set('url', scrapeUrl);
+                
+                // Create FormData for file upload if image is provided
+                let requestData;
+                let requestOptions = {
+                    method: 'POST'
+                };
+                
+                if (imageFile) {
+                    requestData = new FormData();
+                    requestData.append('url', scrapeUrl);
+                    requestData.append('image', imageFile);
+                    requestOptions.body = requestData;
+                } else {
+                    // Use GET request with URL parameter
+                    requestOptions.method = 'GET';
+                }
+                
+                const response = await fetch(url.toString(), requestOptions);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const responseData = await response.text();
+                
+                // Try to parse as JSON
+                let jsonData;
+                try {
+                    jsonData = JSON.parse(responseData);
+                    // Transition to results page
+                    displayResults(jsonData);
+                } catch {
+                    throw new Error('Invalid JSON response from webhook');
+                }
+                
+            } catch (err) {
+                loading.classList.add('hidden');
+                // Show mock data instead of error
+                showMockResults(err.message);
+            } finally {
+                if (error.classList.contains('hidden')) {
+                    // Only reset button if no error occurred
+                } else {
+                    fetchBtn.disabled = false;
+                    loading.classList.add('hidden');
+                }
+            }
+        });
+
+        // Function to display results on page 2
+        function displayResults(data) {
+            // Hide form page
+            document.getElementById('formPage').classList.add('hidden');
+            
+            // Show results page
+            const resultsPage = document.getElementById('resultsPage');
+            resultsPage.classList.remove('hidden');
+            
+            // Handle different JSON structures
+            let products = [];
+            
+            if (Array.isArray(data)) {
+                products = data;
+            } else if (data.products && Array.isArray(data.products)) {
+                products = data.products;
+            } else if (data.Name) {
+                // Single product object
+                products = [data];
+            } else {
+                // Try to find any array in the data
+                for (const key in data) {
+                    if (Array.isArray(data[key])) {
+                        products = data[key];
+                        break;
+                    }
+                }
+            }
+            
+            // Create the results page HTML
+            resultsPage.innerHTML = `
+                <!-- Header with back button -->
+                <header class="bg-white shadow-sm sticky top-0 z-10">
+                    <div class="container mx-auto px-4 py-4">
+                        <div class="flex items-center justify-between">
+                            <button onclick="goBack()" class="flex items-center text-blue-600 hover:text-blue-800 font-medium">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                </svg>
+                                Back to Form
+                            </button>
+                            <h1 class="text-2xl font-bold text-gray-800">Product Data Results</h1>
+                            <div class="text-sm text-gray-500">${products.length} product(s) found</div>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Results Content -->
+                <div class="container mx-auto px-4 py-8">
+                    <div id="productDisplay" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        ${products.length === 0 ? 
+                            '<div class="col-span-full bg-white rounded-xl p-12 text-center text-gray-500"><p class="text-lg">No products found in the response data.</p></div>' :
+                            products.map((product, index) => createProductCard(product, index)).join('')
+                        }
+                    </div>
+                </div>
+            `;
+            
+            // Trigger animations
+            setTimeout(() => {
+                const cards = document.querySelectorAll('.product-card');
+                cards.forEach((card, index) => {
+                    setTimeout(() => {
+                        card.classList.remove('opacity-0', 'translate-y-8');
+                        card.classList.add('opacity-100', 'translate-y-0');
+                    }, index * 150);
+                });
+            }, 100);
+        }
+
+        // Function to create individual product card
+        function createProductCard(product, index) {
+            const productName = product.Name || product.name || product.title || product.productName || 'Unnamed Product';
+            const description = product.Description || product.description || 'No description available';
+            const gender = product.Gender || product.gender || 'Unspecified';
+            const status = product.Status || product.status || 'Available';
+            const stock = product.Stock || product.stock || 'Unknown';
+            const fastestDelivery = product['Fastest Delivery'] || product.fastestDelivery || product.delivery || 'Not specified';
+            
+            // Handle Price object with multiple entries
+            let priceDisplay = '';
+            if (product.Price && typeof product.Price === 'object') {
+                const priceEntries = Object.entries(product.Price);
+                priceDisplay = priceEntries.map(([quantity, price]) => 
+                    `<div class="flex justify-between text-sm">
+                        <span class="text-gray-600">${quantity}:</span>
+                        <span class="font-semibold text-green-600">${price}</span>
+                    </div>`
+                ).join('');
+            } else {
+                priceDisplay = `<div class="text-lg font-bold text-green-600">${product.Price || product.price || 'Price not available'}</div>`;
+            }
+            
+            return `
+                <div class="product-card bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 opacity-0 translate-y-8 hover:-translate-y-2">
+                    <!-- Product Header -->
+                    <div class="mb-6">
+                        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-800 text-center mb-2 leading-tight">${productName}</h3>
+                        <div class="flex justify-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${status === 'In Stock' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}">
+                                <div class="w-2 h-2 ${status === 'In Stock' ? 'bg-green-400' : 'bg-gray-400'} rounded-full mr-2"></div>
+                                ${status}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Product Details -->
+                    <div class="space-y-4">
+                        <!-- Description -->
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-1">Description</h4>
+                            <p class="text-sm text-gray-600 leading-relaxed">${description}</p>
+                        </div>
+
+                        <!-- Gender -->
+                        <div class="flex items-center justify-between py-2 border-b border-gray-100">
+                            <span class="text-sm font-medium text-gray-600">Gender</span>
+                            <span class="text-sm font-semibold text-gray-800">${gender}</span>
+                        </div>
+
+                        <!-- Price -->
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-2">Pricing</h4>
+                            ${priceDisplay}
+                        </div>
+
+                        <!-- Stock -->
+                        <div class="flex items-center justify-between py-2 border-b border-gray-100">
+                            <span class="text-sm font-medium text-gray-600">Stock</span>
+                            <span class="text-sm font-semibold text-gray-800">${stock}</span>
+                        </div>
+
+                        <!-- Delivery -->
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-1">Fastest Delivery</h4>
+                            <div class="flex items-center">
+                                <svg class="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span class="text-sm font-medium text-blue-800">${fastestDelivery}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Function to show mock results when there's an error
+        function showMockResults(errorMessage) {
+            // Mock product data based on the JSON structure shown in the screenshot
+            const mockData = [
+                {
+                    Name: "Breathable Running Towel Bottom",
+                    Description: "High-performance athletic wear designed for comfort and breathability during intense workouts. Features moisture-wicking technology and ergonomic design.",
+                    Gender: "Mens (inferred from title and description)",
+                    Price: {
+                        "100-499 pairs": "US$0.92",
+                        "500-999 pairs": "US$0.86", 
+                        "1000-4999 pairs": "US$0.80",
+                        ">=5000 pairs": "US$0.74"
+                    },
+                    Stock: "9999999 pairs (per each SKU, mixed sizes)",
+                    Status: "In Stock",
+                    "Fastest Delivery": "Dispatch time 10 days"
+                },
+                {
+                    Name: "Premium Athletic Shorts",
+                    Description: "Lightweight and durable shorts perfect for running, gym workouts, and outdoor activities. Made with quick-dry fabric.",
+                    Gender: "Unisex",
+                    Price: {
+                        "50-199 pairs": "US$1.25",
+                        "200-499 pairs": "US$1.15",
+                        "500+ pairs": "US$1.05"
+                    },
+                    Stock: "5000+ pairs available",
+                    Status: "In Stock", 
+                    "Fastest Delivery": "Dispatch time 7 days"
+                },
+                {
+                    Name: "Moisture-Wicking Training Top",
+                    Description: "Advanced fabric technology keeps you dry and comfortable. Features seamless construction and anti-odor treatment.",
+                    Gender: "Womens",
+                    Price: {
+                        "25-99 pieces": "US$2.40",
+                        "100-499 pieces": "US$2.20",
+                        "500+ pieces": "US$1.95"
+                    },
+                    Stock: "Limited stock - 150 pieces",
+                    Status: "Low Stock",
+                    "Fastest Delivery": "Dispatch time 5 days"
+                }
+            ];
+
+            // Hide form page and show results with mock data
+            document.getElementById('formPage').classList.add('hidden');
+            const resultsPage = document.getElementById('resultsPage');
+            resultsPage.classList.remove('hidden');
+            
+            // Create results page with error notice
+            resultsPage.innerHTML = `
+                <!-- Header with back button and error notice -->
+                <header class="bg-white shadow-sm sticky top-0 z-10">
+                    <div class="container mx-auto px-4 py-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <button onclick="goBack()" class="flex items-center text-blue-600 hover:text-blue-800 font-medium">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                </svg>
+                                Back to Form
+                            </button>
+                            <h1 class="text-2xl font-bold text-gray-800">Demo Product Data</h1>
+                            <div class="text-sm text-gray-500">${mockData.length} sample products</div>
+                        </div>
+                        <!-- Error Notice -->
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                </svg>
+                                <div>
+                                    <p class="text-sm font-medium text-yellow-800">Connection Error - Showing Mock Data</p>
+                                    <p class="text-xs text-yellow-700 mt-1">${errorMessage}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Results Content -->
+                <div class="container mx-auto px-4 py-8">
+                    <div id="productDisplay" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        ${mockData.map((product, index) => createProductCard(product, index)).join('')}
+                    </div>
+                </div>
+            `;
+            
+            // Trigger animations
+            setTimeout(() => {
+                const cards = document.querySelectorAll('.product-card');
+                cards.forEach((card, index) => {
+                    setTimeout(() => {
+                        card.classList.remove('opacity-0', 'translate-y-8');
+                        card.classList.add('opacity-100', 'translate-y-0');
+                    }, index * 150);
+                });
+            }, 100);
+        }
+
+        // Function to go back to form
+        function goBack() {
+            document.getElementById('resultsPage').classList.add('hidden');
+            document.getElementById('formPage').classList.remove('hidden');
+            
+            // Reset form state
+            document.getElementById('fetchBtn').disabled = false;
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

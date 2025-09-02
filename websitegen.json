@@ -1,0 +1,222 @@
+{
+    "name": "Dynamically generate a webpage from user request using OpenAI Structured Output 2",
+    "nodes": [
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "={{ $json.html }}",
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Content-Type",
+                  "value": "text/html; charset=UTF-8"
+                }
+              ]
+            }
+          }
+        },
+        "id": "b1d9659f-4cd0-4f87-844d-32b2af1dcf13",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          2528,
+          560
+        ],
+        "typeVersion": 1.1
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.openai.com/v1/chat/completions",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "openAiApi",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ { \"model\": \"gpt-4o-2024-08-06\", \"messages\": [ { \"role\": \"system\", \"content\": \"You are a user interface designer and copy writter. Your job is to help users visualize their website ideas. You design elegant and simple webs, with professional text. You use Tailwind framework\" }, { \"role\": \"user\", \"content\": $json.query.query } ], \"response_format\": { \"type\": \"json_schema\", \"json_schema\": { \"name\": \"ui\", \"description\": \"Dynamically generated UI\", \"strict\": true, \"schema\": { \"type\": \"object\", \"properties\": { \"type\": { \"type\": \"string\", \"description\": \"The type of the UI component\", \"enum\": [ \"div\", \"span\", \"a\", \"p\", \"h1\", \"h2\", \"h3\", \"h4\", \"h5\", \"h6\", \"ul\", \"ol\", \"li\", \"img\", \"button\", \"input\", \"textarea\", \"select\", \"option\", \"label\", \"form\", \"table\", \"thead\", \"tbody\", \"tr\", \"th\", \"td\", \"nav\", \"header\", \"footer\", \"section\", \"article\", \"aside\", \"main\", \"figure\", \"figcaption\", \"blockquote\", \"q\", \"hr\", \"code\", \"pre\", \"iframe\", \"video\", \"audio\", \"canvas\", \"svg\", \"path\", \"circle\", \"rect\", \"line\", \"polyline\", \"polygon\", \"g\", \"use\", \"symbol\" ] }, \"label\": { \"type\": \"string\", \"description\": \"The label of the UI component, used for buttons or form fields\" }, \"children\": { \"type\": \"array\", \"description\": \"Nested UI components\", \"items\": { \"$ref\": \"#\" } }, \"attributes\": { \"type\": \"array\", \"description\": \"Arbitrary attributes for the UI component, suitable for any element using Tailwind framework\", \"items\": { \"type\": \"object\", \"properties\": { \"name\": { \"type\": \"string\", \"description\": \"The name of the attribute, for example onClick or className\" }, \"value\": { \"type\": \"string\", \"description\": \"The value of the attribute using the Tailwind framework classes\" } }, \"additionalProperties\": false, \"required\": [ \"name\", \"value\" ] } } }, \"required\": [ \"type\", \"label\", \"children\", \"attributes\" ], \"additionalProperties\": false } } } } }}",
+          "options": {}
+        },
+        "id": "5ca8ad3e-7702-4f07-af24-d38e94fdc4ec",
+        "name": "Open AI - Using Structured Output",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1616,
+          560
+        ],
+        "typeVersion": 4.2,
+        "credentials": {
+          "openAiApi": {
+            "id": "8cKIvCxNE6HxnUt7",
+            "name": "OpenAi account 2"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "modelId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "gpt-4o-mini",
+            "cachedResultName": "GPT-4O-MINI"
+          },
+          "messages": {
+            "values": [
+              {
+                "content": "You convert a JSON to HTML. \nThe JSON output has the following fields:\n- html: the page HTML\n- title: the page title",
+                "role": "system"
+              },
+              {
+                "content": "={{ $json.choices[0].message.content }}"
+              }
+            ]
+          },
+          "jsonOutput": true,
+          "options": {
+            "temperature": 0.2
+          }
+        },
+        "id": "24e5ca73-a3b3-4096-8c66-d84838d89b0c",
+        "name": "OpenAI - JSON to HTML",
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "position": [
+          1792,
+          560
+        ],
+        "typeVersion": 1.3,
+        "credentials": {
+          "openAiApi": {
+            "id": "8cKIvCxNE6HxnUt7",
+            "name": "OpenAi account 2"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "html": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta charset=\"UTF-8\" />\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n  <title>{{ $json.message.content.title }}</title>\n</head>\n<body>\n{{ $json.message.content.html }}\n</body>\n</html>"
+        },
+        "id": "c50bdc84-ba59-4f30-acf7-496cee25068d",
+        "name": "Format the HTML result",
+        "type": "n8n-nodes-base.html",
+        "position": [
+          2320,
+          560
+        ],
+        "typeVersion": 1.2
+      },
+      {
+        "parameters": {
+          "content": "## Generate HTML from user query\n\n**HTTP Request node**\n- Send the user query to OpenAI, with a defined JSON response format - *using HTTP Request node as it has not yet been implemented in the OpenAI nodes*\n- The response format is inspired by the [Structured Output defined in OpenAI Introduction post](https://openai.com/index/introducing-structured-outputs-in-the-api)\n- The output is a JSON containing HTML components and attributed\n\n\n**OpenAI node**\n- Format the response from the previous node from JSON format to HTML format",
+          "height": 503,
+          "width": 638,
+          "color": 7
+        },
+        "id": "193093f4-b1ce-4964-ab10-c3208e343c69",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1504,
+          256
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "content": "## Workflow: Dynamically generate an HTML page from a user request using OpenAI Structured Output\n\n**Overview**\n- This workflow is a experiment to build HTML pages from a user input using the new Structured Output from OpenAI.\n- The Structured Output could be used in a variety of cases. Essentially, it guarantees the output from the GPT will follow a defined structure (JSON object).\n- It uses Tailwind CSS to make it slightly nicer, but any\n\n**How it works**\n- Once active, go to the production URL and add what you'd like to build as the parameter \"query\"\n- Example: https://production_url.com?query=a%20signup%20form\n- OpenAI nodes will first output the UI as a JSON then convert it to HTML\n- Finally, the response is integrated in a HTML container and rendered to the user\n\n**Further thoughts**\n- Results are not yet amazing, it is hard to see the direct value of such an experiment\n- But it showcase the potential of the Structured Output. Being able to guarantee the output format is key to build robust AI applications.",
+          "height": 503,
+          "width": 768,
+          "color": 7
+        },
+        "id": "0371156a-211f-4d92-82b1-f14fe60d4b6b",
+        "name": "Sticky Note1",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          368,
+          240
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "path": "d962c916-6369-431a-9d80-af6e6a50fdf5",
+          "responseMode": "responseNode",
+          "options": {
+            "allowedOrigins": "*"
+          }
+        },
+        "id": "06380781-5189-4d99-9ecd-d8913ce40fd5",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          1200,
+          560
+        ],
+        "webhookId": "d962c916-6369-431a-9d80-af6e6a50fdf5",
+        "typeVersion": 2
+      }
+    ],
+    "pinData": {},
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Open AI - Using Structured Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "OpenAI - JSON to HTML": {
+        "main": [
+          [
+            {
+              "node": "Format the HTML result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format the HTML result": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Open AI - Using Structured Output": {
+        "main": [
+          [
+            {
+              "node": "OpenAI - JSON to HTML",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": false,
+    "settings": {},
+    "versionId": "71f20f40-b228-4b12-864d-9f44a00e2615",
+    "meta": {
+      "templateId": "2388",
+      "instanceId": "b146abcc4e4be91e1536483962a0772e33f11df99b5edb9730bd0e833edf7583"
+    },
+    "id": "Th7M0dBnhVvszobk",
+    "tags": []
+  }
